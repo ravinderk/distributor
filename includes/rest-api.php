@@ -7,7 +7,7 @@
 
 namespace Distributor\RestApi;
 
-use Distributor\Utils;
+use Distributor\DistributorPost;
 
 /**
  * Setup actions and filters
@@ -154,6 +154,93 @@ function register_rest_routes() {
 			'args'                => get_pull_content_list_args(),
 		)
 	);
+
+	register_rest_route(
+		'wp/v2',
+		'distributor/pull-content/(?P<id>[\d]+)',
+		array(
+			'methods'             => 'POST',
+			'callback'            => __NAMESPACE__ . '\pull_content',
+			'args' => array(
+				'id' => array(
+					'validate_callback' => function( $value ) {
+						return is_numeric( $value );
+					},
+					'required'          => true,
+				),
+				'remote_post_id' => array(
+					'validate_callback' => function( $value ) {
+						return is_numeric( $value );
+					},
+					'sanitize_callback' => function( $value ) {
+						return (int) $value;
+					},
+					'required'          => false,
+				),
+				'post_status' => array(
+					'validate_callback' => function( $value ) {
+						return is_string( $value );
+					},
+					'sanitize_callback' => 'sanitize_key',
+					'required'          => false,
+				),
+			),
+			'permission_callback' => function( $request ) {
+				$rest_post_types = get_post_types( array( 'show_in_rest' => true ) );
+				$post_type       = get_post_type( $request['id'] );
+
+				/*
+				 * Only allow access to posts that exist.
+				 *
+				 * `get_post_type()` returns false for posts that don't exist.
+				 */
+				if ( ! $post_type ) {
+					return new \WP_Error(
+						'rest_post_invalid_id',
+						__( 'Invalid post ID.', 'distributor' ),
+						array( 'status' => 404 )
+					);
+				}
+
+				// Only allow access to posts types that are registered with the REST API.
+				if ( ! in_array( $post_type, $rest_post_types, true ) ) {
+					return false;
+				}
+
+				/*
+				 * The user must have permission to edit the post.
+				 *
+				 * The distributor post endpoint returns content for a post in its raw form,
+				 * so we need to make sure the user has permission to view the raw content.
+				 *
+				 * Only users with the `edit_post` meta capability are permitted to view the
+				 * posts in this form so we use that as the permission callback.
+				 */
+				return current_user_can( 'edit_post', $request['id'] );
+			},
+		)
+	);
+}
+
+/**
+ * Pull content of a particular post.
+ *
+ * @since x.x.x
+ *
+ * @param  WP_REST_Request $request Request object.
+ * @return WP_REST_Response The post content formatted as a rest response.
+ */
+function pull_content( $request ) {
+	$post_id = $request['id'];
+	$args    = array();
+	if ( isset( $request['post_status'] ) ) {
+		$args['post_status'] = $request['post_status'];
+	}
+	if ( isset( $request['remote_post_id'] ) ) {
+		$args['remote_post_id'] = $request['remote_post_id'];
+	}
+	$dt_post = new DistributorPost( $post_id );
+	return new \WP_REST_Response( $dt_post->to_insert( $args ) );
 }
 
 /**
