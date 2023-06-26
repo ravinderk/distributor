@@ -91,12 +91,12 @@ jobs:
       run: echo "Branch name is ${{ steps.branch-name.outputs.branch }}"
 
     - name: PHPCS on all files
-      if: ${{ steps.branch-name.outputs.branch } == 'develop' || ${{ steps.branch-name.outputs.branch } == 'trunk' }
+      if: ${{ steps.branch-name.outputs.branch == 'develop' || steps.branch-name.outputs.branch == 'trunk' }}
       id: phpcs-sniffs
       run: ./vendor/bin/phpcs . --report-full --report-checkstyle=./.github/phpcs-report.xml
 
     - name: PHPCS on changed files
-      if: ${{ steps.branch-name.outputs.branch } != 'develop' || ${{ steps.branch-name.outputs.branch } != 'trunk' }
+      if: ${{ steps.branch-name.outputs.branch != 'develop' || steps.branch-name.outputs.branch != 'trunk' }}
       id: phpcs-sniffs
       run: ./vendor/bin/phpcs . --report-full --report-checkstyle=./.github/phpcs-report.xml
 
